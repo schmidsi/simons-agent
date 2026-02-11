@@ -1,7 +1,7 @@
 FROM node:20
 
 RUN apt-get update && apt-get install -y \
-    git curl ripgrep fd-find jq tree vim unzip \
+    git curl ripgrep fd-find jq tree vim unzip gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI
@@ -28,5 +28,8 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+    CMD pgrep -x "sleep" > /dev/null || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

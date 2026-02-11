@@ -28,5 +28,5 @@ echo "=== Simon's Agent ==="
 echo "Run: claude --dangerously-skip-permissions"
 echo ""
 
-# Keep container alive
-exec sleep infinity
+# Drop to node user and keep container alive
+exec gosu node sleep infinity
