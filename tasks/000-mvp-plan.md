@@ -13,52 +13,61 @@ Run Claude Code (`claude --dangerously-skip-permissions`) in an isolated Docker 
 - **Base**: `node:20` (same as hackathon-judging reference)
 - **Installed tools**: git, curl, ripgrep, fd-find, jq, vim, gh CLI, Claude Code (npm global)
 - **Git identity**: `Simon Agent <simon+agent@schmid.io>`
-- **Port 80** exposed — forwarded to whatever dev port Claude uses (via simple reverse proxy or socat)
+- **Port 80** exposed — Coolify's reverse proxy routes a subdomain here (e.g. `agent.yourdomain.xyz`), handles SSL
 - **Volumes**:
-  - `workspace` — persistent volume for `/workspace` (survives container rebuilds)
+  - `workspace` — persistent volume for `/workspace` (survives container rebuilds, not catastrophic if lost)
   - `claude-config` — persistent volume for `/home/node/.claude` (auth state, settings)
-- **Env**: `ANTHROPIC_API_KEY` passed in
+- **Env vars**:
+  - `ANTHROPIC_API_KEY` — Claude API access
+  - `GH_SSH_KEY` — private SSH key for dedicated GitHub agent account, written to `~/.ssh/id_ed25519` at startup
 
 ### How it works (MVP)
 
 1. Deploy via Coolify (push to repo, Coolify builds & runs)
 2. SSH into Hetzner, `docker exec -it simons-agent bash`
 3. Run `claude --dangerously-skip-permissions` interactively
-4. Claude works in `/workspace`, can start dev servers on any port
-5. Port 80 on the container maps to port 80 on the host → accessible via domain/IP
+4. Claude works in `/workspace`, can start dev servers on port 80
+5. Coolify routes subdomain → container port 80 with SSL
 
 ### Entrypoint
 
-Simple: just keep the container alive (`tail -f /dev/null` or `bash` with tty). No auto-start of Claude — MVP is interactive-first.
+1. Write `$GH_SSH_KEY` env var → `~/.ssh/id_ed25519` (chmod 600)
+2. Configure SSH for GitHub (`StrictHostKeyChecking no`)
+3. Keep container alive (`tail -f /dev/null` or `sleep infinity`)
 
-## Open Questions
+No auto-start of Claude — MVP is interactive-first.
 
-1. **SSH keys for GitHub**: Should we mount SSH keys (like hackathon-judging does) or use `gh auth` with a token? Token is simpler for Coolify deployment (just another env var).
+### Security model
 
-2. **Port forwarding strategy**: Should port 80 inside the container just be left open and Claude uses it directly? Or do we want a lightweight reverse proxy (like caddy/nginx) that proxies to whatever port Claude's dev server runs on (3000, 5173, 8080, etc.)?
+- Runs as non-root `node` user
+- `--dangerously-skip-permissions` is fine because the container IS the sandbox
+- Dedicated GitHub account with access only to repos the agent should touch
+- SSH key injected at runtime via env var (not baked into image)
+- Persistent volumes are convenient but not critical — losing them is annoying, not a disaster
 
-3. **Claude auth**: The `ANTHROPIC_API_KEY` env var should be enough. But do you also want Claude's OAuth/login state persisted? (The `~/.claude` volume handles this.)
+## Decisions Made
 
-4. **Coolify specifics**: Do you have a domain pointed at the Hetzner box already? Coolify typically handles SSL/domains — so we might not need port 80 at all if Coolify's reverse proxy handles routing.
+1. **GitHub access**: Dedicated GitHub account, SSH key passed as `GH_SSH_KEY` env var, written to disk at container startup. Simple and works well with Coolify's env var management.
 
-5. **Security boundaries**: The reference project runs as `node` (non-root) and uses `--dangerously-skip-permissions`. Same approach here? Any repos/secrets that should be pre-loaded into the workspace volume?
+2. **Port strategy**: Coolify handles domain routing + SSL. Container exposes port 80. Claude should start dev servers on port 80 directly (or we add a simple proxy later if needed).
 
-6. **Telegram (future)**: Just noting for later — likely a small bot service (second container in the compose) that talks to the agent container. Not MVP.
+3. **Persistent storage**: Docker named volumes for workspace and Claude config. Survive rebuilds. Not mission-critical data.
+
+4. **Security**: Non-root `node` user + container isolation. Good enough for MVP.
 
 ## Files to Create
 
 - `Dockerfile` — container image
 - `docker-compose.yml` — service definition for Coolify
-- `entrypoint.sh` — keeps container alive
+- `entrypoint.sh` — SSH key setup + keep-alive
 - `.env.example` — documents required env vars
 - `.gitignore` — excludes `.env`
 - `CLAUDE.md` — instructions for Claude when working inside the container
 - `README.md` — quick overview + fast-track for future sessions
 
-## What's NOT in MVP
+## Future (not MVP)
 
-- No Telegram bot
-- No auto-task execution
-- No web UI
-- No multi-agent orchestration
-- No CI/CD pipeline (Coolify handles deploy on push)
+- **Telegram bot**: Second container in compose, communicates with agent container
+- Auto-task execution (agent picks up task files and works on them)
+- Web UI for monitoring
+- Multi-agent orchestration
