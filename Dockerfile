@@ -1,8 +1,11 @@
 FROM node:20
 
 RUN apt-get update && apt-get install -y \
-    git curl ripgrep fd-find jq tree vim unzip gosu \
+    git curl ripgrep fd-find jq tree vim unzip gosu openssh-server \
     && rm -rf /var/lib/apt/lists/*
+
+# SSH server setup
+RUN mkdir -p /run/sshd
 
 # GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -27,9 +30,9 @@ WORKDIR /workspace
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-EXPOSE 80
+EXPOSE 80 2222
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
-    CMD pgrep -x "sleep" > /dev/null || exit 1
+    CMD pgrep -x "sshd" > /dev/null || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

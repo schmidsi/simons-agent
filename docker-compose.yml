@@ -3,8 +3,11 @@ services:
     build: .
     container_name: simons-agent
     restart: unless-stopped
+    ports:
+      - "2222:2222"
     environment:
       - GH_SSH_KEY=${GH_SSH_KEY}
+      - SSH_AUTHORIZED_KEY=${SSH_AUTHORIZED_KEY}
     volumes:
       - workspace:/workspace
       - claude-config:/home/node/.claude

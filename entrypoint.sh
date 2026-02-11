@@ -23,10 +23,31 @@ else
     echo "Warning: GH_SSH_KEY not set. Git push/pull over SSH won't work."
 fi
 
+# Set up SSH access for the user
+if [ -n "$SSH_AUTHORIZED_KEY" ]; then
+    echo "$SSH_AUTHORIZED_KEY" > /home/node/.ssh/authorized_keys
+    chmod 600 /home/node/.ssh/authorized_keys
+    chown node:node /home/node/.ssh/authorized_keys
+    echo "SSH authorized key configured."
+else
+    echo "Warning: SSH_AUTHORIZED_KEY not set. SSH login won't work."
+fi
+
+# Configure sshd to run on port 2222 as node user
+cat > /etc/ssh/sshd_config.d/agent.conf <<SSHDEOF
+Port 2222
+PermitRootLogin no
+PasswordAuthentication no
+AllowUsers node
+SSHDEOF
+
+# Give node a login shell
+usermod -s /bin/bash node
+
 echo ""
 echo "=== Simon's Agent ==="
-echo "Run: claude --dangerously-skip-permissions"
+echo "SSH: ssh -p 2222 node@<host>"
 echo ""
 
-# Drop to node user and keep container alive
-exec gosu node sleep infinity
+# Start sshd in foreground
+exec /usr/sbin/sshd -D
