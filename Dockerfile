@@ -25,6 +25,10 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN mkdir -p /workspace /home/node/.claude /home/node/.ssh \
     && chown -R node:node /workspace /home/node/.claude /home/node/.ssh
 
+# Convenience script
+RUN echo '#!/bin/bash\ncd /workspace && exec claude --dangerously-skip-permissions "$@"' \
+    > /usr/local/bin/c && chmod +x /usr/local/bin/c
+
 WORKDIR /workspace
 
 COPY entrypoint.sh /entrypoint.sh
