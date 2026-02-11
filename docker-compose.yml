@@ -3,8 +3,6 @@ services:
     build: .
     container_name: simons-agent
     restart: unless-stopped
-    ports:
-      - "80:80"
     environment:
       - GH_SSH_KEY=${GH_SSH_KEY}
     volumes:
